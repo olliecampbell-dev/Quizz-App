@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VocabQuiz</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ── HOME ── -->
+  <div id="screen-home" class="screen active">
+    <header class="app-header">
+      <h1 class="logo">VocabQuiz</h1>
+      <button id="btn-new-set" class="btn-primary" onclick="navigate('editor', null)">+ New Set</button>
+    </header>
+    <div id="sets-list" class="sets-list"></div>
+    <div id="empty-state" class="empty-state">
+      <div class="empty-icon">📚</div>
+      <p>No sets yet.<br>Create your first vocab set to get started.</p>
+    </div>
+  </div>
+
+  <!-- ── EDITOR ── -->
+  <div id="screen-editor" class="screen">
+    <header class="app-header">
+      <button class="btn-back" onclick="navigate('home')">← Back</button>
+      <h2 id="editor-title">New Set</h2>
+      <button id="btn-save-set" class="btn-primary" onclick="saveSet()">Save</button>
+    </header>
+    <div class="editor-body">
+      <input type="text" id="set-name" class="set-name-input" placeholder="Set name (e.g. Chapter 5 Vocab)" />
+      <div class="separator-row">
+        <label for="set-separator">Separator (between term and definition):</label>
+        <input type="text" id="set-separator" class="separator-input" value="—" maxlength="10" />
+      </div>
+      <textarea
+        id="vocab-input"
+        class="vocab-textarea"
+        placeholder="Paste vocab here, one card per line:
+
+Mitosis — Cell division process
+Meiosis — Produces sex cells
+Osmosis — Water moving across membranes"
+      ></textarea>
+      <div id="preview-label" class="preview-label" style="display:none">Preview</div>
+      <div id="preview-cards" class="preview-cards"></div>
+    </div>
+  </div>
+
+  <!-- ── MODE SELECTION ── -->
+  <div id="screen-modes" class="screen">
+    <header class="app-header">
+      <button class="btn-back" onclick="navigate('home')">← Back</button>
+      <h2 id="mode-set-name" class="truncate"></h2>
+      <button class="btn-icon" onclick="editCurrentSet()" title="Edit set">✏️</button>
+    </header>
+    <div id="set-progress-summary" class="progress-summary"></div>
+    <div class="modes-grid">
+      <button class="mode-card" onclick="startMode('flashcards')">
+        <span class="mode-icon">🃏</span>
+        <span class="mode-name">Flashcards</span>
+        <span class="mode-desc">Flip cards, self-grade</span>
+      </button>
+      <button class="mode-card" onclick="startMode('multiple-choice')">
+        <span class="mode-icon">☑️</span>
+        <span class="mode-name">Multiple Choice</span>
+        <span class="mode-desc">Pick the right answer</span>
+      </button>
+      <button class="mode-card" onclick="startMode('typing')">
+        <span class="mode-icon">⌨️</span>
+        <span class="mode-name">Write</span>
+        <span class="mode-desc">Type the answer from memory</span>
+      </button>
+      <button class="mode-card mode-learn" onclick="startMode('learn')">
+        <span class="mode-icon">🧠</span>
+        <span class="mode-name">Learn</span>
+        <span class="mode-desc">Adaptive mix of MC + typing — ends when you know everything</span>
+        <span class="mode-badge">RECOMMENDED</span>
+      </button>
+    </div>
+    <div class="modes-actions">
+      <button class="btn-danger-outline" onclick="resetSetProgress()">Reset Progress</button>
+    </div>
+  </div>
+
+  <!-- ── FLASHCARDS ── -->
+  <div id="screen-flashcards" class="screen">
+    <header class="app-header">
+      <button class="btn-back" onclick="navigate('modes')">← Back</button>
+      <span id="flashcard-counter" class="counter">1 / 10</span>
+      <button class="btn-text" onclick="shuffleFlashcards()">Shuffle</button>
+    </header>
+    <div class="flashcard-area">
+      <div id="flashcard" class="flashcard" onclick="flipCard()">
+        <div class="flashcard-inner" id="flashcard-inner">
+          <div class="flashcard-face flashcard-front">
+            <span class="face-label" id="flashcard-front-label">Term</span>
+            <span id="flashcard-front-text" class="card-text"></span>
+          </div>
+          <div class="flashcard-face flashcard-back">
+            <span class="face-label" id="flashcard-back-label">Definition</span>
+            <span id="flashcard-back-text" class="card-text"></span>
+          </div>
+        </div>
+      </div>
+      <p class="tap-hint">Tap to flip</p>
+    </div>
+    <div class="flashcard-controls">
+      <button class="btn-nav" onclick="prevCard()">←</button>
+      <div id="self-grade" class="self-grade" style="display:none">
+        <button class="btn-wrong" onclick="gradeCard(false)">✗ Still learning</button>
+        <button class="btn-correct" onclick="gradeCard(true)">✓ Know it</button>
+      </div>
+      <button class="btn-nav" onclick="nextCard()">→</button>
+    </div>
+    <div id="flashcard-dots" class="flashcard-dots"></div>
+  </div>
+
+  <!-- ── QUIZ (Multiple Choice + Typing + Learn) ── -->
+  <div id="screen-quiz" class="screen">
+    <header class="app-header quiz-header">
+      <button class="btn-back" onclick="confirmQuit()">✕</button>
+      <div class="progress-bar-wrap">
+        <div id="quiz-progress-bar" class="progress-bar-fill"></div>
+      </div>
+      <span id="quiz-mode-label" class="quiz-mode-label"></span>
+    </header>
+
+    <div class="quiz-body" id="quiz-body">
+
+      <!-- Prompt -->
+      <div class="quiz-prompt-wrap">
+        <div id="quiz-direction-label" class="direction-label"></div>
+        <div id="quiz-prompt" class="quiz-prompt"></div>
+      </div>
+
+      <!-- Multiple choice -->
+      <div id="mc-options" class="mc-options"></div>
+
+      <!-- Typing -->
+      <div id="typing-area" class="typing-area" style="display:none">
+        <input
+          type="text"
+          id="typing-input"
+          class="typing-input"
+          placeholder="Type your answer..."
+          autocomplete="off"
+          autocorrect="off"
+          spellcheck="false"
+          onkeydown="handleTypingKey(event)"
+        />
+        <button id="btn-check" class="btn-primary" onclick="checkTypingAnswer()">Check</button>
+      </div>
+
+      <!-- Feedback overlay -->
+      <div id="quiz-feedback" class="quiz-feedback" style="display:none">
+        <div id="feedback-banner" class="feedback-banner"></div>
+        <div id="feedback-correct-answer" class="feedback-correct-answer"></div>
+        <button id="btn-continue" class="btn-continue" onclick="nextQuestion()">Continue →</button>
+      </div>
+
+    </div>
+
+    <!-- Learn progress strip -->
+    <div id="learn-status-bar" class="learn-status-bar" style="display:none">
+      <span id="learn-mastered-count">0 mastered</span>
+      <span id="learn-remaining-count">0 remaining</span>
+    </div>
+  </div>
+
+  <!-- ── RESULTS ── -->
+  <div id="screen-results" class="screen">
+    <div class="results-body">
+      <div id="results-icon" class="results-icon"></div>
+      <h2 id="results-title" class="results-title"></h2>
+      <div id="results-stats" class="results-stats"></div>
+      <div id="results-wrong-list" class="results-wrong-list"></div>
+      <div class="results-actions">
+        <button class="btn-primary" onclick="restartSession()">Study Again</button>
+        <button class="btn-secondary" onclick="navigate('modes')">Back to Modes</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
